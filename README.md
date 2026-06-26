@@ -74,6 +74,31 @@ Você também pode apontar para outro provedor compatível com a API OpenAI (Dee
 
 > O app falha na inicialização se `LlmApiKey` estiver vazio — por design, para evitar erros silenciosos em produção.
 
+#### Usando o OpenRouter
+
+O [OpenRouter](https://openrouter.ai) é um gateway compatível com a API OpenAI — prático e barato. Como o provedor é apenas configuração, funciona sem tocar no código:
+
+```json
+"Assistant": {
+  "LlmEndpoint": "https://openrouter.ai/api/v1",
+  "LlmModel": "openai/gpt-4o-mini"
+}
+```
+
+```bash
+dotnet user-secrets set "Assistant:LlmApiKey" "sk-or-v1-..." --project src/AiAssistant.API
+```
+
+**A arquitetura inteira depende do modelo chamar tools** (é assim que as skills funcionam — a `SampleSkillsGroup`, e as suas no futuro):
+
+- **Chat + pipeline de segurança:** funciona com qualquer modelo.
+- **Skills (tools):** exige um modelo com suporte a *function calling*. No OpenRouter, escolha um com tools — bons e baratos: `openai/gpt-4o-mini`, `google/gemini-2.0-flash-001`, `deepseek/deepseek-chat`. **Evite** os `:free` (geralmente sem tools e com rate limit agressivo).
+
+Dois detalhes que derrubam quem é novo no OpenRouter:
+
+1. **O `LlmModel` é namespaced** (`openai/gpt-4o-mini`, não `gpt-4o-mini`). Se apontar pro OpenRouter e deixar o default `gpt-4o-mini`, dá erro de modelo inexistente.
+2. Os headers `HTTP-Referer`/`X-Title` do OpenRouter são **opcionais** (só ranking/atribuição) — não precisa, o template funciona sem.
+
 ### 2. Rodar
 
 ```bash
