@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.RegularExpressions;
 using AiAssistant.Core.Interfaces.Middleware;
 
@@ -45,7 +45,7 @@ public sealed partial class InputNormalizer : IInputNormalizer
 
 		foreach (var character in input)
 		{
-			if (character is '​' or '‌' or '‍' or '﻿')
+			if (character is '\u200B' or '\u200C' or '\u200D' or '\uFEFF')
 				continue;
 
 			builder.Append(character);
