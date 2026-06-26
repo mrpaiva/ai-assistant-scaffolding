@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "AiAssistant.API": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:61316;http://localhost:61317"
+    }
+  }
+}

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Assistente Virtual</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- marked 9.1.6 — pinned CDN, verified integrity -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"
+            integrity="sha256-vHhgAGFlmBKRJsU/svtbZ55VvvzZJ5RNyXv5FxHMDrc="
+            crossorigin="anonymous"></script>
+    <!-- DOMPurify 3.0.6 — pinned CDN, verified integrity -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"
+            integrity="sha256-BvOkFJBf43hIOXA3wkuNijgH2EZq0A4/DfLM8VvVWpI="
+            crossorigin="anonymous"></script>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="avatar-container">
+                <img
+                    src="assets/avatar.png"
+                    alt="Assistente"
+                    class="avatar"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                />
+                <div class="avatar-fallback" style="display:none;">A</div>
+            </div>
+            <div class="header-info">
+                <h1 class="assistant-name">Assistente Virtual</h1>
+                <span class="status-indicator">● Online</span>
+            </div>
+            <button id="new-chat-btn" class="new-chat-btn" title="Nova conversa">&#x1F5D1;</button>
+        </div>
+
+        <div id="messages" class="messages-container">
+            <!-- mensagens adicionadas dinamicamente -->
+        </div>
+
+        <div class="input-container">
+            <textarea
+                id="message-input"
+                placeholder="Digite sua mensagem..."
+                rows="1"
+                autocomplete="off"
+            ></textarea>
+            <button id="send-btn" class="send-btn" title="Enviar">&#x27A4;</button>
+        </div>
+    </div>
+
+    <script>
+        // ─── Estado ──────────────────────────────────────────────────────────
+        const STORAGE_KEY = 'assistant_user_id';
+        let userId = localStorage.getItem(STORAGE_KEY);
+        if (!userId) {
+            userId = 'user-' + Math.random().toString(36).slice(2, 10);
+            localStorage.setItem(STORAGE_KEY, userId);
+        }
+
+        let context = null;
+
+        /** Define o contexto a ser enviado com as próximas mensagens (chamado externamente pelo host). */
+        window.setContext = function (c) { context = c; };
+
+        // ─── Referências DOM ─────────────────────────────────────────────────
+        const messagesEl = document.getElementById('messages');
+        const inputEl    = document.getElementById('message-input');
+        const sendBtn    = document.getElementById('send-btn');
+        const newChatBtn = document.getElementById('new-chat-btn');
+
+        // ─── Utilitários ─────────────────────────────────────────────────────
+        function addMessage(text, role) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message ' + role;
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+
+            if (role === 'assistant') {
+                bubble.innerHTML = DOMPurify.sanitize(marked.parse(text));
+            } else {
+                bubble.textContent = text;
+            }
+
+            wrapper.appendChild(bubble);
+            messagesEl.appendChild(wrapper);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function setLoading(loading) {
+            sendBtn.disabled = loading;
+            inputEl.disabled = loading;
+            sendBtn.textContent = loading ? '…' : '➤';
+        }
+
+        // ─── Ação de client ───────────────────────────────────────────────────
+        function handleClientAction(action) {
+            if (action.type === 'showToast') {
+                addMessage('🔔 ' + (action.payload || ''), 'assistant');
+            } else {
+                console.log('ClientAction:', action);
+            }
+        }
+
+        // ─── Envio de mensagem ────────────────────────────────────────────────
+        async function sendMessage() {
+            const message = inputEl.value.trim();
+            if (!message) return;
+
+            addMessage(message, 'user');
+            inputEl.value = '';
+            inputEl.style.height = 'auto';
+            setLoading(true);
+
+            try {
+                const response = await fetch('/api/assistant/message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, message, context })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    addMessage('Erro: ' + (err.error || response.statusText), 'assistant');
+                    return;
+                }
+
+                const data = await response.json();
+                addMessage(data.reply, 'assistant');
+
+                if (data.action) {
+                    handleClientAction(data.action);
+                }
+            } catch (e) {
+                addMessage('Não foi possível conectar ao assistente. Tente novamente em instantes.', 'assistant');
+                console.error(e);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // ─── Nova conversa ────────────────────────────────────────────────────
+        async function newChat() {
+            try {
+                await fetch('/api/assistant/session/' + encodeURIComponent(userId), { method: 'DELETE' });
+            } catch (_) { /* ignora erro de rede */ }
+
+            messagesEl.innerHTML = '';
+            addMessage('Olá! Sou seu assistente virtual. Como posso ajudar?', 'assistant');
+        }
+
+        // ─── Eventos ──────────────────────────────────────────────────────────
+        sendBtn.addEventListener('click', sendMessage);
+
+        inputEl.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        inputEl.addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        newChatBtn.addEventListener('click', newChat);
+
+        // ─── Inicialização ────────────────────────────────────────────────────
+        addMessage('Olá! Sou seu assistente virtual. Como posso ajudar?', 'assistant');
+    </script>
+</body>
+</html>
