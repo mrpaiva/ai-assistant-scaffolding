@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<ItemGroup>
+		<PackageReference Include="Ardalis.GuardClauses" />
+		<PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
+	</ItemGroup>
+
+</Project>

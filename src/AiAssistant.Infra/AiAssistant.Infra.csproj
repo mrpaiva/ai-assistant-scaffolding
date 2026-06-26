@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<ItemGroup>
+		<ProjectReference Include="..\AiAssistant.Core\AiAssistant.Core.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Ardalis.GuardClauses" />
+		<PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="AiAssistant.UnitTests" />
+	</ItemGroup>
+
+</Project>
