@@ -91,6 +91,7 @@
             sendBtn.disabled = loading;
             inputEl.disabled = loading;
             sendBtn.textContent = loading ? '…' : '➤';
+            if (!loading) inputEl.focus();
         }
 
         // Indicador de "digitando" — bolha do assistente com 3 bolinhas animadas.
@@ -107,10 +108,30 @@
             if (typingEl) { typingEl.remove(); typingEl = null; }
         }
 
+        // ─── Toast flutuante ──────────────────────────────────────────────────
+        function showToast(message) {
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                container.className = 'toast-container';
+                document.body.appendChild(container);
+            }
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = '🔔 ' + message;   // textContent: payload vem do LLM, é dado não-confiável
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 250);
+            }, 3500);
+        }
+
         // ─── Ação de client ───────────────────────────────────────────────────
         function handleClientAction(action) {
             if (action.type === 'showToast') {
-                addMessage('🔔 ' + (action.payload || ''), 'assistant');
+                showToast(action.payload || '');
             } else {
                 console.log('ClientAction:', action);
             }
@@ -184,6 +205,7 @@
 
         // ─── Inicialização ────────────────────────────────────────────────────
         addMessage('Olá! Sou seu assistente virtual. Experimente: `que horas são?` (chama a tool `get_current_time`) ou `mostra um toast dizendo oi` (dispara um `ClientAction`) para ver o *tool calling* em ação. 🙂', 'assistant');
+        inputEl.focus();
     </script>
 </body>
 </html>
