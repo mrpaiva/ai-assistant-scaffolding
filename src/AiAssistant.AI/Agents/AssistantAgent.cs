@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
@@ -62,7 +62,7 @@ public sealed class AssistantAgent : IAssistantAgent
 
 	private readonly ILogger<AssistantAgent> _logger;
 	private readonly AIAgent _agent;
-	private readonly ConcurrentDictionary<string, SessionEntry> _sessionsByOperator = new();
+	private readonly ConcurrentDictionary<string, SessionEntry> _sessionsByUser = new();
 
 	#region Documentation
 	/// <summary>
@@ -165,7 +165,7 @@ public sealed class AssistantAgent : IAssistantAgent
 
 				var responseText = response.Text;
 
-				await LogConversationTurnAsync(userId, entry, message, responseText, stopwatch, cancellationToken);
+				await LogConversationTurnAsync(userId, message, responseText, stopwatch, cancellationToken);
 
 				return responseText;
 			}
@@ -185,10 +185,7 @@ public sealed class AssistantAgent : IAssistantAgent
 			const string friendlyMessage =
 				"Eita, tive um probleminha técnico aqui. Pode tentar de novo em alguns instantes? Se continuar, chama o suporte que eles me ajudam! 😊";
 
-			if (_sessionsByOperator.TryGetValue(userId, out var errorEntry))
-				await LogConversationTurnAsync(userId, errorEntry, message, friendlyMessage, stopwatch, cancellationToken);
-			else
-				await LogConversationTurnAsync(userId, message, friendlyMessage, stopwatch, cancellationToken);
+			await LogConversationTurnAsync(userId, message, friendlyMessage, stopwatch, cancellationToken);
 
 			return friendlyMessage;
 		}
@@ -201,12 +198,12 @@ public sealed class AssistantAgent : IAssistantAgent
 	{
 		Guard.Against.NullOrWhiteSpace(userId);
 
-		if (!_sessionsByOperator.TryGetValue(userId, out var entry))
+		if (!_sessionsByUser.TryGetValue(userId, out var entry))
 			return null;
 
 		if (entry.IsExpired(_sessionTimeout))
 		{
-			_sessionsByOperator.TryRemove(userId, out _);
+			_sessionsByUser.TryRemove(userId, out _);
 			return null;
 		}
 
@@ -220,7 +217,7 @@ public sealed class AssistantAgent : IAssistantAgent
 	{
 		Guard.Against.NullOrWhiteSpace(userId);
 
-		return _sessionsByOperator.TryRemove(userId, out _);
+		return _sessionsByUser.TryRemove(userId, out _);
 	}
 
 	#region Documentation
@@ -233,7 +230,7 @@ public sealed class AssistantAgent : IAssistantAgent
 	#endregion Documentation
 	internal void RecordClientAction(string userId, ClientAction action)
 	{
-		if (_sessionsByOperator.TryGetValue(userId, out var entry))
+		if (_sessionsByUser.TryGetValue(userId, out var entry))
 			entry.RecordClientAction(action);
 	}
 
@@ -244,7 +241,7 @@ public sealed class AssistantAgent : IAssistantAgent
 	{
 		Guard.Against.NullOrWhiteSpace(userId);
 
-		return _sessionsByOperator.TryGetValue(userId, out var entry)
+		return _sessionsByUser.TryGetValue(userId, out var entry)
 			? entry.ConsumePendingAction()
 			: null;
 	}
@@ -269,7 +266,7 @@ public sealed class AssistantAgent : IAssistantAgent
 			#region Comments
 			// Barreira 1 (input): normaliza ANTES de detectar. FormKC + remoção de
 			// zero-width/control chars desfaz evasões por homóglifo (ｉｇｎｏｒｅ) ou caractere
-			// invisível (ignor​e) que de outro modo escapariam dos padrões do detector.
+			// invisível (ex.: 'ignor\u200Be') que de outro modo escapariam dos padrões do detector.
 			#endregion Comments
 			var normalizedText = _inputNormalizer.Normalize(lastUserText);
 
@@ -305,7 +302,6 @@ public sealed class AssistantAgent : IAssistantAgent
 
 	private async Task LogConversationTurnAsync(
 		string userId,
-		SessionEntry? entry,
 		string input,
 		string response,
 		Stopwatch stopwatch,
@@ -323,14 +319,6 @@ public sealed class AssistantAgent : IAssistantAgent
 		await _conversationLogger.LogTurnAsync(turn, cancellationToken);
 	}
 
-	private Task LogConversationTurnAsync(
-		string userId,
-		string input,
-		string response,
-		Stopwatch stopwatch,
-		CancellationToken cancellationToken) =>
-		LogConversationTurnAsync(userId, null, input, response, stopwatch, cancellationToken);
-
 	private async Task<SessionEntry> GetOrCreateSessionAsync(string userId, CancellationToken cancellationToken)
 	{
 		#region Comments
@@ -338,12 +326,12 @@ public sealed class AssistantAgent : IAssistantAgent
 		// AgentSession e substitui a expirada. CreateSessionAsync é assíncrono, então não cabe no
 		// factory do GetOrAdd; em corrida, a sessão recém-criada perde para a existente válida.
 		#endregion Comments
-		if (_sessionsByOperator.TryGetValue(userId, out var existing) && !existing.IsExpired(_sessionTimeout))
+		if (_sessionsByUser.TryGetValue(userId, out var existing) && !existing.IsExpired(_sessionTimeout))
 			return existing;
 
 		var mafSession = await _agent.CreateSessionAsync(cancellationToken);
 
-		var entry = _sessionsByOperator.AddOrUpdate(
+		var entry = _sessionsByUser.AddOrUpdate(
 			userId,
 			_ => new SessionEntry(mafSession),
 			(_, current) => current.IsExpired(_sessionTimeout) ? new SessionEntry(mafSession) : current);
@@ -367,13 +355,13 @@ public sealed class AssistantAgent : IAssistantAgent
 	#endregion Documentation
 	public int PurgeExpiredSessions()
 	{
-		var expiredKeys = _sessionsByOperator
+		var expiredKeys = _sessionsByUser
 			.Where(pair => pair.Value.IsExpired(_sessionTimeout))
 			.Select(pair => pair.Key)
 			.ToList();
 
 		foreach (var key in expiredKeys)
-			_sessionsByOperator.TryRemove(key, out _);
+			_sessionsByUser.TryRemove(key, out _);
 
 		return expiredKeys.Count;
 	}
