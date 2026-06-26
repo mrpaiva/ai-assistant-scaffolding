@@ -1,0 +1,23 @@
+# Specs, tasks e ADRs vivem no Linear — docs/ é área de rascunho local, nunca versionada.
+# (Evita poluir todo projeto novo gerado a partir deste template.)
+docs/
+
+# .NET build
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.user
+*.suo
+.vs/
+
+# Segredos / configuração local
+appsettings.Development.json
+appsettings.*.Local.json
+secrets.json
+*.db
+
+# Dados de runtime
+Data/
