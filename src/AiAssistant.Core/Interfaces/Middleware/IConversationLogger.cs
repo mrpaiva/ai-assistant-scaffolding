@@ -5,7 +5,7 @@ namespace AiAssistant.Core.Interfaces.Middleware;
 #region Documentation
 /// <summary>
 /// Registra os turnos de conversação entre o operador e o assistente,
-/// incluindo entrada, SQL gerado, resposta e métricas de performance.
+/// incluindo entrada, resposta e métricas de performance.
 /// </summary>
 #endregion Documentation
 public interface IConversationLogger
