@@ -17,17 +17,20 @@ O template é organizado em quatro camadas:
 
 ### Fluxo de uma requisição
 
+```mermaid
+flowchart TD
+    A[Controller] --> B[AssistantAgent.ProcessMessageAsync]
+    B --> N["1 · InputNormalizer<br/>FormKC + remove zero-width/homóglifos"]
+    N --> D{"2 · InjectionDetector"}
+    D -->|injeção detectada| R["Resposta canônica do guard<br/><b>sem chamar o LLM</b>"]
+    D -->|ok| C["3 · ChatClientAgent<br/>tool calling automático via ISkillGroups"]
+    C --> O["4 · OutputScanner<br/>mascara vazamento de instruções internas"]
+    O --> L["ConversationLogger<br/>userId · input · resposta · latência"]
+    R --> L
+    L --> M["MessageResponse(Reply, ClientAction?)"]
 ```
-Controller
-  → AssistantAgent.ProcessMessageAsync
-      → Middleware de segurança MAF:
-          1. InputNormalizer  (normaliza: FormKC + remoção de zero-width/homóglifos)
-          2. InjectionDetector (detecta → curto-circuita sem chamar o LLM se positivo)
-          3. ChatClientAgent  (tool calling automático via ISkillGroups)
-          4. OutputScanner    (varre resposta → substitui se vazar instruções internas)
-      → ConversationLogger   (registra turno: userId, input, resposta, latência)
-  → MessageResponse(Reply, ClientAction?)
-```
+
+As barreiras 1–4 rodam como **middleware dentro do pipeline do MAF** (`AIAgentBuilder.Use`): a detecção de injeção **curto-circuita antes do LLM**, e o turno é auditado mesmo quando bloqueado.
 
 ---
 
@@ -107,6 +110,13 @@ dotnet run --project src/AiAssistant.API
 
 Abra o navegador na URL exibida no terminal para acessar a UI de chat.
 
+Para ver o **tool calling** em ação, experimente:
+
+- `que horas são?` → o modelo chama a tool `get_current_time` e responde com a data/hora real.
+- `mostra um toast dizendo oi` → o modelo chama `show_toast`, que volta um `ClientAction` para o front (a notificação 🔔).
+
+Perguntar *"o que você sabe fazer?"* só **descreve** as capacidades — a tool é invocada quando a tarefa exige.
+
 ### 3. Testes
 
 ```bash
@@ -115,28 +125,51 @@ dotnet test
 
 ---
 
-## Criando suas skills
+## Criando sua primeira skill
 
-1. Implemente `ISkillGroup` em um novo arquivo:
+Uma skill é uma classe que implementa `ISkillGroup` e expõe uma ou mais `AIFunction`s. O `AssistantAgent` recebe `IEnumerable<ISkillGroup>`, junta as tools de todos os grupos e entrega ao modelo — que decide quando chamar cada uma a partir da **descrição** que você escreve.
+
+**1. Implemente `ISkillGroup`** em um arquivo novo (ex.: `src/AiAssistant.AI/Skills/Calculadora/CalculadoraSkillsGroup.cs`):
 
 ```csharp
-public sealed class MinhasSkills : ISkillGroup
-{
-    public IEnumerable<AITool> BuildTools() =>
-        AIFunctionFactory.Create(MinhaFuncao, "minha_funcao", "Descrição da tool").Yield();
+using System.ComponentModel;
+using AiAssistant.AI.Skills;
+using Microsoft.Extensions.AI;
 
-    [Description("Executa alguma coisa")]
-    private static string MinhaFuncao(string param) => "resultado";
+public sealed class CalculadoraSkillsGroup : ISkillGroup
+{
+    public string GroupName => "CalculadoraSkills";
+
+    public IReadOnlyList<AIFunction> BuildTools() =>
+    [
+        AIFunctionFactory.Create(
+            Somar,
+            "somar",
+            "Soma dois números. Use quando o usuário pedir um cálculo de adição."),
+    ];
+
+    [Description("Retorna a soma de a e b")]
+    private static double Somar(
+        [Description("primeiro número")] double a,
+        [Description("segundo número")] double b) => a + b;
 }
 ```
 
-2. Registre no DI (em `ServiceCollectionExtensions.AddAiAssistant` ou direto em `Program.cs`):
+> A **descrição** da tool e de cada parâmetro é o que o modelo lê para decidir quando e como chamá-la — capriche nelas.
+
+**2. Registre no DI** (em `ServiceCollectionExtensions.AddAiAssistant`):
 
 ```csharp
-services.AddSingleton<ISkillGroup, MinhasSkills>();
+services.AddSingleton<ISkillGroup, CalculadoraSkillsGroup>();
 ```
 
-3. Veja `SampleSkillsGroup` como exemplo de referência — **delete a `SampleSkillsGroup` quando tiver as suas**.
+**3. Teste:** rode o app e peça *"quanto é 17 + 25?"* — o modelo vai chamar `somar` e responder `42`.
+
+### Tools que agem no cliente (`ClientAction`)
+
+Quando uma tool precisa disparar algo no front (navegar, abrir um modal, exibir um toast), ela registra um `ClientAction` que volta na resposta HTTP (`MessageResponse.Action`). Como o grupo precisa falar com o agente — que guarda o `ClientAction` pendente da sessão —, ele recebe no construtor um `Func<string?>` (userId corrente) e um `Action<string, ClientAction>` (callback), e o DI injeta o agente via `Lazy<>` para quebrar o ciclo agente↔skill. Use a `SampleSkillsGroup` (tool `show_toast`) e o seu registro em `ServiceCollectionExtensions` como referência.
+
+> **Quando tiver as suas skills, delete a `SampleSkillsGroup`** (e o teste dela) — ela existe só para demonstrar o padrão.
 
 ---
 
@@ -164,6 +197,6 @@ Após o rename, abra a solução pelo novo arquivo `.slnx` gerado.
 
 ## Segurança
 
-- `appsettings.json` contém apenas placeholders (sem valores reais).
-- Segredos vão exclusivamente via `dotnet user-secrets` (desenvolvimento) ou variáveis de ambiente / key vault (produção).
-- O `.gitignore` já cobre `appsettings.Development.json`, `secrets.json`, `*.db` e `Data/`.
+- O repositório versiona apenas `appsettings.example.json` (placeholders, sem valores reais); o `appsettings.json` real fica **fora do git**.
+- Segredos vão via `appsettings.json` local, `dotnet user-secrets` (desenvolvimento) ou variáveis de ambiente / key vault (produção) — nunca commitados.
+- O `.gitignore` já cobre `appsettings.json`, `appsettings.Development.json`, `secrets.json`, `*.db` e `Data/`.

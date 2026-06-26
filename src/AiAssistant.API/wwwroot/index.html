@@ -162,7 +162,7 @@
             } catch (_) { /* ignora erro de rede */ }
 
             messagesEl.innerHTML = '';
-            addMessage('Olá! Sou seu assistente virtual. Como posso ajudar?', 'assistant');
+            addMessage('Olá! Sou seu assistente virtual. Experimente: `que horas são?` (chama a tool `get_current_time`) ou `mostra um toast dizendo oi` (dispara um `ClientAction`) para ver o *tool calling* em ação. 🙂', 'assistant');
         }
 
         // ─── Eventos ──────────────────────────────────────────────────────────
@@ -183,7 +183,7 @@
         newChatBtn.addEventListener('click', newChat);
 
         // ─── Inicialização ────────────────────────────────────────────────────
-        addMessage('Olá! Sou seu assistente virtual. Como posso ajudar?', 'assistant');
+        addMessage('Olá! Sou seu assistente virtual. Experimente: `que horas são?` (chama a tool `get_current_time`) ou `mostra um toast dizendo oi` (dispara um `ClientAction`) para ver o *tool calling* em ação. 🙂', 'assistant');
     </script>
 </body>
 </html>
