@@ -124,8 +124,6 @@ $itemsToRename = Get-ChildItem -Path $root -Recurse -ErrorAction SilentlyContinu
 
 foreach ($item in $itemsToRename) {
     $newName = $item.Name.Replace($token, $Name)
-    $parentDir = if ($item -is [System.IO.FileInfo]) { $item.DirectoryName } else { $item.Parent.FullName }
-    $newPath = Join-Path $parentDir $newName
     Write-Host "  RENAME: $($item.FullName.Substring($root.Length + 1)) → $newName"
     if ($Apply) {
         Rename-Item -Path $item.FullName -NewName $newName -Force

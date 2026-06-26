@@ -11,22 +11,22 @@ namespace AiAssistant.Infra.Middleware;
 #endregion Documentation
 public sealed class SessionValidator : ISessionValidator
 {
-	private readonly ConcurrentDictionary<string, string> _sessionToOperator = new();
+	private readonly ConcurrentDictionary<string, string> _sessionToUser = new();
 
 	#region Documentation
 	/// <inheritdoc />
 	#endregion Documentation
-	public bool RegisterSession(string sessionId, string operatorId) =>
-		_sessionToOperator.TryAdd(sessionId, operatorId);
+	public bool RegisterSession(string sessionId, string userId) =>
+		_sessionToUser.TryAdd(sessionId, userId);
 
 	#region Documentation
 	/// <inheritdoc />
 	#endregion Documentation
-	public bool Validate(string operatorId, string sessionId)
+	public bool Validate(string userId, string sessionId)
 	{
-		if (!_sessionToOperator.TryGetValue(sessionId, out var registeredOperator))
+		if (!_sessionToUser.TryGetValue(sessionId, out var registeredUser))
 			return false;
 
-		return string.Equals(registeredOperator, operatorId, StringComparison.Ordinal);
+		return string.Equals(registeredUser, userId, StringComparison.Ordinal);
 	}
 }

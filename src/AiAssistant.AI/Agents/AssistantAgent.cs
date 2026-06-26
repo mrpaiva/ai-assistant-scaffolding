@@ -108,6 +108,11 @@ public sealed class AssistantAgent : IAssistantAgent
 		var instructions = LoadEmbeddedPrompt("assistant-system.md");
 
 		#region Comments
+		// Materializa para permitir múltipla enumeração (BuildTools + log de GroupName).
+		#endregion Comments
+		var skillGroupList = skillGroups.ToList();
+
+		#region Comments
 		// O ChatClientAgent assume o loop de tool calling. Instruções e tools vão via ChatOptions
 		// (ChatClientAgentOptions não expõe Instructions diretamente).
 		#endregion Comments
@@ -119,7 +124,7 @@ public sealed class AssistantAgent : IAssistantAgent
 				ChatOptions = new ChatOptions
 				{
 					Instructions = instructions,
-					Tools = skillGroups.SelectMany(g => g.BuildTools()).ToArray()
+					Tools = skillGroupList.SelectMany(g => g.BuildTools()).ToArray()
 				}
 			},
 			loggerFactory);
@@ -132,6 +137,8 @@ public sealed class AssistantAgent : IAssistantAgent
 		_agent = new AIAgentBuilder(baseAgent)
 			.Use(RunWithSecurityMiddlewareAsync, null)
 			.Build();
+
+		_logger.LogDebug("Skill groups registrados: {Groups}", string.Join(", ", skillGroupList.Select(g => g.GroupName)));
 	}
 
 	#region Documentation
@@ -203,7 +210,8 @@ public sealed class AssistantAgent : IAssistantAgent
 
 		if (entry.IsExpired(_sessionTimeout))
 		{
-			_sessionsByUser.TryRemove(userId, out _);
+			if (_sessionsByUser.TryRemove(userId, out var removed))
+				DisposeSession(removed);
 			return null;
 		}
 
@@ -217,7 +225,13 @@ public sealed class AssistantAgent : IAssistantAgent
 	{
 		Guard.Against.NullOrWhiteSpace(userId);
 
-		return _sessionsByUser.TryRemove(userId, out _);
+		if (_sessionsByUser.TryRemove(userId, out var removed))
+		{
+			DisposeSession(removed);
+			return true;
+		}
+
+		return false;
 	}
 
 	#region Documentation
@@ -225,6 +239,9 @@ public sealed class AssistantAgent : IAssistantAgent
 	/// Registra uma <see cref="ClientAction"/> pendente na sessão do usuário.
 	/// Chamado pelas skills via callback após acionamento da tool.
 	/// </summary>
+	/// <remarks>
+	/// Apenas a última <see cref="ClientAction"/> pendente por turno é mantida — uma nova sobrescreve a anterior; não é uma fila.
+	/// </remarks>
 	/// <param name="userId">Identificador do usuário.</param>
 	/// <param name="action">Ação a ser executada no client.</param>
 	#endregion Documentation
@@ -248,7 +265,7 @@ public sealed class AssistantAgent : IAssistantAgent
 
 	private async Task<AgentResponse> RunWithSecurityMiddlewareAsync(
 		IEnumerable<ChatMessage> messages,
-		MafSession session,
+		MafSession? session,
 		AgentRunOptions? options,
 		AIAgent innerAgent,
 		CancellationToken cancellationToken)
@@ -337,6 +354,12 @@ public sealed class AssistantAgent : IAssistantAgent
 			(_, current) => current.IsExpired(_sessionTimeout) ? new SessionEntry(mafSession) : current);
 
 		#region Comments
+		// Descarta a entrada expirada que foi substituída pelo AddOrUpdate, se alguma foi capturada.
+		#endregion Comments
+		if (existing != null && !ReferenceEquals(existing, entry))
+			DisposeSession(existing);
+
+		#region Comments
 		// Em corrida, a sessão recém-criada pode perder para uma existente válida. Descarta a órfã
 		// para não vazar o recurso subjacente do MAF.
 		#endregion Comments
@@ -361,9 +384,18 @@ public sealed class AssistantAgent : IAssistantAgent
 			.ToList();
 
 		foreach (var key in expiredKeys)
-			_sessionsByUser.TryRemove(key, out _);
+		{
+			if (_sessionsByUser.TryRemove(key, out var removed))
+				DisposeSession(removed);
+		}
 
 		return expiredKeys.Count;
+	}
+
+	private static void DisposeSession(SessionEntry entry)
+	{
+		if (entry.Session is IDisposable disposable)
+			disposable.Dispose();
 	}
 
 	private static List<ChatMessage> BuildInput(string userMessage, string? context)

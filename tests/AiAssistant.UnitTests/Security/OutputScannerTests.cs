@@ -110,7 +110,7 @@ public class OutputScannerTests
 	public void instrucoes_em_contexto_legitimo_nao_detecta_vazamento()
 	{
 		// Arrange
-		var response = "As instruções do manual dizem que o sócio deve apresentar o cartão.";
+		var response = "As instruções do manual dizem que o atendimento funciona assim.";
 
 		// Act
 		var (leaked, sanitized) = _sut.Scan(response);

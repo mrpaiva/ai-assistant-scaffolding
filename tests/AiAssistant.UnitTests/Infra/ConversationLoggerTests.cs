@@ -25,22 +25,26 @@ public class ConversationLoggerTests
 	{
 		// Arrange
 		var turn = new ConversationTurn(
-			userId: "op-123",
+			userId: "user-123",
 			timestamp: DateTimeOffset.UtcNow,
-			input: "quais pagamentos vencem essa semana?",
+			input: "qual o dia de hoje?",
 			response: "Encontrei 5 pagamentos que vencem esta semana.",
 			latencyMs: 320);
 
 		// Act
 		await _sut.LogTurnAsync(turn, CancellationToken.None);
 
-		// Assert — verifica que o logger foi chamado ao menos uma vez
-		_loggerMock.ReceivedWithAnyArgs(1).Log(
-			Arg.Any<LogLevel>(),
-			Arg.Any<EventId>(),
-			Arg.Any<object>(),
-			Arg.Any<Exception?>(),
-			Arg.Any<Func<object, Exception?, string>>());
+		// Assert — captura o estado logado e verifica campos obrigatórios
+		var calls = _loggerMock.ReceivedCalls().ToList();
+		calls.Should().HaveCount(1);
+
+		var args = calls[0].GetArguments();
+		var stateObject = args[2];
+		var loggedMessage = stateObject?.ToString() ?? string.Empty;
+
+		loggedMessage.Should().Contain("user-123");
+		loggedMessage.Should().Contain("qual o dia de hoje?");
+		loggedMessage.Should().Contain("Encontrei 5 pagamentos que vencem esta semana.");
 	}
 
 	[TestMethod]
@@ -49,7 +53,7 @@ public class ConversationLoggerTests
 		// Arrange
 		var longResponse = new string('A', 1000);
 		var turn = new ConversationTurn(
-			userId: "op-123",
+			userId: "user-123",
 			timestamp: DateTimeOffset.UtcNow,
 			input: "consulta longa",
 			response: longResponse,

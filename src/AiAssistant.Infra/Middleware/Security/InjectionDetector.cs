@@ -71,7 +71,7 @@ public sealed partial class InjectionDetector : IInjectionDetector
 	#region Documentation
 	/// <inheritdoc />
 	#endregion Documentation
-	public (bool detected, string? pattern) Detect(string input, string operatorId)
+	public (bool detected, string? pattern) Detect(string input, string userId)
 	{
 		if (string.IsNullOrWhiteSpace(input)) return (false, null);
 

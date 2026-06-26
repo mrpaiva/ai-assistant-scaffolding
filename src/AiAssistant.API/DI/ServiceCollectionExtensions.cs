@@ -55,7 +55,6 @@ public static class ServiceCollectionExtensions
 		services.AddSingleton<IInjectionDetector, InjectionDetector>();
 		services.AddSingleton<IOutputScanner, OutputScanner>();
 		services.AddSingleton<IConversationLogger, ConversationLogger>();
-		services.AddSingleton<ISessionValidator, SessionValidator>();
 
 		services.AddSingleton<ISkillGroup>(sp =>
 		{
