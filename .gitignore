@@ -13,7 +13,9 @@ x86/
 *.suo
 .vs/
 
-# Segredos / configuração local
+# Segredos / configuração local.
+# O appsettings.json real (com a chave) NÃO é versionado — use appsettings.example.json como modelo.
+appsettings.json
 appsettings.Development.json
 appsettings.*.Local.json
 secrets.json

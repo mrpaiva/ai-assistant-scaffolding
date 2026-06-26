@@ -57,19 +57,19 @@ Essas decisões estão documentadas como ADRs no projeto do Linear.
 
 ### 1. Configurar a chave da API
 
-**Nunca commite segredos.** Use user-secrets:
+**Nunca commite segredos.** O `appsettings.json` real **não é versionado** (está no `.gitignore`); o repositório traz apenas `appsettings.example.json` como modelo. Copie o exemplo e preencha a chave:
+
+```bash
+cp src/AiAssistant.API/appsettings.example.json src/AiAssistant.API/appsettings.json
+# edite appsettings.json e preencha "Assistant:LlmApiKey"
+```
+
+O exemplo já vem apontando para o OpenRouter (`Assistant:LlmEndpoint` / `Assistant:LlmModel`); troque por qualquer provedor compatível com a API OpenAI (OpenAI, DeepSeek, Groq, Ollama, etc.). Veja a seção **Usando o OpenRouter** abaixo.
+
+Alternativa (sem editar arquivo), via user-secrets:
 
 ```bash
 dotnet user-secrets set "Assistant:LlmApiKey" "<sua-chave>" --project src/AiAssistant.API
-```
-
-Você também pode apontar para outro provedor compatível com a API OpenAI (DeepSeek, Groq, Ollama, etc.) alterando em `appsettings.json`:
-
-```json
-"Assistant": {
-  "LlmEndpoint": "https://api.deepseek.com/v1",
-  "LlmModel": "deepseek-chat"
-}
 ```
 
 > O app falha na inicialização se `LlmApiKey` estiver vazio — por design, para evitar erros silenciosos em produção.
