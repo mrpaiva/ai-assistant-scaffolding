@@ -93,6 +93,20 @@
             sendBtn.textContent = loading ? '…' : '➤';
         }
 
+        // Indicador de "digitando" — bolha do assistente com 3 bolinhas animadas.
+        let typingEl = null;
+        function showTyping() {
+            if (typingEl) return;
+            typingEl = document.createElement('div');
+            typingEl.className = 'message assistant';
+            typingEl.innerHTML = '<div class="bubble typing"><span></span><span></span><span></span></div>';
+            messagesEl.appendChild(typingEl);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+        function hideTyping() {
+            if (typingEl) { typingEl.remove(); typingEl = null; }
+        }
+
         // ─── Ação de client ───────────────────────────────────────────────────
         function handleClientAction(action) {
             if (action.type === 'showToast') {
@@ -111,6 +125,7 @@
             inputEl.value = '';
             inputEl.style.height = 'auto';
             setLoading(true);
+            showTyping();
 
             try {
                 const response = await fetch('/api/assistant/message', {
@@ -135,6 +150,7 @@
                 addMessage('Não foi possível conectar ao assistente. Tente novamente em instantes.', 'assistant');
                 console.error(e);
             } finally {
+                hideTyping();
                 setLoading(false);
             }
         }
